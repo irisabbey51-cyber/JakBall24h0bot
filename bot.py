@@ -5,6 +5,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from datetime import datetime
 import asyncio
+import sys
 
 # Enable logging
 logging.basicConfig(
@@ -13,15 +14,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Bot Token from environment variable
+# Get Bot Token from environment variable with error handling
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
+if not BOT_TOKEN:
+    logger.error("❌ BOT_TOKEN not found in environment variables!")
+    logger.error("Please set BOT_TOKEN in Railway environment variables")
+    sys.exit(1)
+
 CHANNEL_LINK = "https://t.me/CruptoDealss"
 
 # CoinGecko API endpoint
 COINGECKO_API = "https://api.coingecko.com/api/v3"
-
-# Store user preferences (in production, use a database)
-user_preferences = {}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a welcome message when /start is issued."""
@@ -63,7 +66,7 @@ Join our channel for exclusive updates and deals!
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a help message when /help is issued."""
-    help_text = """
+    help_text = f"""
 📚 *Available Commands:*
 
 /start - Start the bot
@@ -101,7 +104,8 @@ async def get_crypto_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 'per_page': 5,
                 'page': 1,
                 'sparkline': False
-            }
+            },
+            timeout=10
         )
         
         if response.status_code == 200:
@@ -109,9 +113,10 @@ async def get_crypto_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             price_message = "💰 *Top Cryptocurrency Prices* 💰\n\n"
             
             for coin in data:
+                price_change = coin.get('price_change_percentage_24h', 0)
                 price_message += f"• *{coin['name']} ({coin['symbol'].upper()})*\n"
                 price_message += f"  💵 Price: ${coin['current_price']:,.2f}\n"
-                price_message += f"  📈 24h Change: {coin['price_change_percentage_24h']:.2f}%\n"
+                price_message += f"  📈 24h Change: {price_change:.2f}%\n"
                 price_message += f"  📊 Market Cap: ${coin['market_cap']:,.0f}\n\n"
             
             price_message += "\n*Join our channel for more updates:*\n"
@@ -140,7 +145,7 @@ async def get_crypto_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 async def get_news(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Get latest crypto news."""
-    news_message = """
+    news_message = f"""
 📰 *Latest Crypto News* 📰
 
 *Top Headlines:*
@@ -171,14 +176,14 @@ async def get_news(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        news_message.format(CHANNEL_LINK=CHANNEL_LINK),
+        news_message,
         parse_mode='Markdown',
         reply_markup=reply_markup
     )
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """User settings menu."""
-    settings_text = """
+    settings_text = f"""
 ⚙️ *Settings* ⚙️
 
 Customize your crypto experience!
@@ -206,7 +211,7 @@ For immediate updates and support, join our channel:
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        settings_text.format(CHANNEL_LINK=CHANNEL_LINK),
+        settings_text,
         parse_mode='Markdown',
         reply_markup=reply_markup
     )
@@ -244,6 +249,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await query.answer()
     
     if query.data == 'prices':
+        # Create a fake update for price function
         await get_crypto_price(update, context)
     elif query.data == 'news':
         await get_news(update, context)
@@ -251,7 +257,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await settings(update, context)
     elif query.data == 'alerts':
         await query.edit_message_text(
-            "🔔 *Price Alerts*\n\n"
+            f"🔔 *Price Alerts*\n\n"
             "Set up price alerts for your favorite cryptocurrencies.\n"
             "Coming soon! Stay tuned.\n\n"
             f"Join our channel for updates: {CHANNEL_LINK}",
@@ -259,7 +265,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
     elif query.data == 'news_pref':
         await query.edit_message_text(
-            "📰 *News Preferences*\n\n"
+            f"📰 *News Preferences*\n\n"
             "Customize your news feed.\n"
             "Coming soon! Stay tuned.\n\n"
             f"Join our channel for updates: {CHANNEL_LINK}",
@@ -272,34 +278,51 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 def main() -> None:
     """Start the bot."""
-    # Create the Application
-    application = Application.builder().token(BOT_TOKEN).build()
+    try:
+        # Log that we're starting
+        logger.info("🤖 JakBall24h0bot is starting...")
+        logger.info(f"Bot Token: {BOT_TOKEN[:10]}... (hidden for security)")
+        
+        # Create the Application
+        application = Application.builder().token(BOT_TOKEN).build()
 
-    # Register command handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("price", get_crypto_price))
-    application.add_handler(CommandHandler("news", get_news))
-    application.add_handler(CommandHandler("settings", settings))
-    application.add_handler(CommandHandler("channel", channel))
-    
-    # Register callback handler
-    application.add_handler(CallbackQueryHandler(button_callback))
-    
-    # Register error handler
-    application.add_error_handler(error_handler)
+        # Register command handlers
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("help", help_command))
+        application.add_handler(CommandHandler("price", get_crypto_price))
+        application.add_handler(CommandHandler("news", get_news))
+        application.add_handler(CommandHandler("settings", settings))
+        application.add_handler(CommandHandler("channel", channel))
+        
+        # Register callback handler
+        application.add_handler(CallbackQueryHandler(button_callback))
+        
+        # Register error handler
+        application.add_error_handler(error_handler)
 
-    # Start the Bot
-    print("🤖 JakBall24h0bot is starting...")
-    port = int(os.environ.get('PORT', 8443))
-    
-    # Run the bot with webhook support for Railway
-    application.run_webhook(
-        listen="0.0.0.0",
-        port=port,
-        url_path=BOT_TOKEN,
-        webhook_url=f"https://{os.environ.get('RAILWAY_STATIC_URL', '')}/{BOT_TOKEN}"
-    )
+        # Get port from environment (Railway sets this)
+        port = int(os.environ.get('PORT', 8443))
+        
+        # Get Railway URL
+        railway_url = os.environ.get('RAILWAY_STATIC_URL')
+        
+        if railway_url:
+            # Run with webhook on Railway
+            logger.info(f"🚀 Starting bot with webhook on port {port}")
+            application.run_webhook(
+                listen="0.0.0.0",
+                port=port,
+                url_path=BOT_TOKEN,
+                webhook_url=f"https://{railway_url}/{BOT_TOKEN}"
+            )
+        else:
+            # Run with polling (for local development)
+            logger.info("🔄 Starting bot with polling (local mode)")
+            application.run_polling()
+            
+    except Exception as e:
+        logger.error(f"❌ Failed to start bot: {e}")
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()
