@@ -4,6 +4,7 @@ import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 import sys
+import asyncio
 
 # Enable logging
 logging.basicConfig(
@@ -243,7 +244,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await query.answer()
     
     if query.data == 'prices':
-        # Create a new message with prices
         await get_crypto_price(update, context)
     elif query.data == 'news':
         await get_news(update, context)
@@ -286,26 +286,12 @@ def main() -> None:
         application.add_handler(CommandHandler("news", get_news))
         application.add_handler(CommandHandler("settings", settings))
         application.add_handler(CommandHandler("channel", channel))
-        
-        # Register callback handler
         application.add_handler(CallbackQueryHandler(button_callback))
-        
-        # Register error handler
         application.add_error_handler(error_handler)
 
-        # Get port from environment
-        port = int(os.environ.get('PORT', 8080))
-        
-        # Start the bot using webhook for Railway
-        logger.info(f"🚀 Starting bot with webhook on port {port}")
-        
-        # Run with webhook
-        application.run_webhook(
-            listen="0.0.0.0",
-            port=port,
-            url_path=BOT_TOKEN,
-            webhook_url=None  # Let Railway handle the URL
-        )
+        # Start the bot with polling
+        logger.info("✅ Bot is running! Press Ctrl+C to stop.")
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
             
     except Exception as e:
         logger.error(f"❌ Failed to start bot: {e}")
