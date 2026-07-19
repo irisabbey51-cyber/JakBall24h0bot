@@ -3,8 +3,6 @@ import logging
 import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
-from datetime import datetime
-import asyncio
 import sys
 
 # Enable logging
@@ -14,16 +12,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Get Bot Token from environment variable with error handling
+# Get Bot Token from environment variable
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 if not BOT_TOKEN:
     logger.error("❌ BOT_TOKEN not found in environment variables!")
-    logger.error("Please set BOT_TOKEN in Railway environment variables")
+    logger.error("Please add BOT_TOKEN to Railway environment variables")
     sys.exit(1)
 
 CHANNEL_LINK = "https://t.me/CruptoDealss"
-
-# CoinGecko API endpoint
 COINGECKO_API = "https://api.coingecko.com/api/v3"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -95,7 +91,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def get_crypto_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Get cryptocurrency prices."""
     try:
-        # Get top 5 cryptocurrencies
         response = requests.get(
             f"{COINGECKO_API}/coins/markets",
             params={
@@ -119,8 +114,7 @@ async def get_crypto_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 price_message += f"  📈 24h Change: {price_change:.2f}%\n"
                 price_message += f"  📊 Market Cap: ${coin['market_cap']:,.0f}\n\n"
             
-            price_message += "\n*Join our channel for more updates:*\n"
-            price_message += f"{CHANNEL_LINK}"
+            price_message += f"\n*Join our channel for more updates:*\n{CHANNEL_LINK}"
             
             keyboard = [
                 [InlineKeyboardButton("🔄 Refresh Prices", callback_data='prices')],
@@ -249,7 +243,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await query.answer()
     
     if query.data == 'prices':
-        # Create a fake update for price function
+        # Create a new message with prices
         await get_crypto_price(update, context)
     elif query.data == 'news':
         await get_news(update, context)
@@ -279,7 +273,6 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 def main() -> None:
     """Start the bot."""
     try:
-        # Log that we're starting
         logger.info("🤖 JakBall24h0bot is starting...")
         logger.info(f"Bot Token: {BOT_TOKEN[:10]}... (hidden for security)")
         
@@ -300,28 +293,24 @@ def main() -> None:
         # Register error handler
         application.add_error_handler(error_handler)
 
-        # Get port from environment (Railway sets this)
-        port = int(os.environ.get('PORT', 8443))
+        # Get port from environment
+        port = int(os.environ.get('PORT', 8080))
         
-        # Get Railway URL
-        railway_url = os.environ.get('RAILWAY_STATIC_URL')
+        # Start the bot using webhook for Railway
+        logger.info(f"🚀 Starting bot with webhook on port {port}")
         
-        if railway_url:
-            # Run with webhook on Railway
-            logger.info(f"🚀 Starting bot with webhook on port {port}")
-            application.run_webhook(
-                listen="0.0.0.0",
-                port=port,
-                url_path=BOT_TOKEN,
-                webhook_url=f"https://{railway_url}/{BOT_TOKEN}"
-            )
-        else:
-            # Run with polling (for local development)
-            logger.info("🔄 Starting bot with polling (local mode)")
-            application.run_polling()
+        # Run with webhook
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            url_path=BOT_TOKEN,
+            webhook_url=None  # Let Railway handle the URL
+        )
             
     except Exception as e:
         logger.error(f"❌ Failed to start bot: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 if __name__ == '__main__':
